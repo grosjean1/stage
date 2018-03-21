@@ -1,0 +1,74 @@
+load "gmsh"
+load "lapack"
+mesh Th =gmshload("projet.msh");
+plot(Th , wait = true, cmm= "solution");
+savemesh(Th,"projet_versionFreefem.msh");
+cout<<"nombre de points dans M="<<Th.nv<<endl;
+//phib=phibarre; phit1 = phitilde1; phit2 = phitilde2
+
+fespace Mh(Th,P1);
+Mh phib,phit1,phit2,v,v1,v2,v3;
+real nu=1.;
+real d=1.;
+real f0=1.;
+real u0 = 0.143;
+
+///////////////////////////////////////////////////************************************************************///////////////////////////////////////////////////
+
+problem pb1(phib,v1,solver=CG)=int2d(Th)(dx(phib)*dx(v1)+dy(phib)*dy(v1))+int1d(Th,1)(u0*v1)-int1d(Th,2)(u0*v1) +  on(4,phib=0); //bord entree=1; sortie=2; tube= 3
+pb1;
+
+
+plot(phib,wait=true);
+
+///////////////////////////////////////////////////************************************************************///////////////////////////////////////////////////
+
+problem pb2(phit1,v2,solver=CG)=int2d(Th)(dx(phit1)*dx(v2)+dy(phit1)*dy(v2)) - int1d(Th,3)(N.y*v2)+  on(4,phit1=0); //N vect normal de gamma0 sortant du domaine du fluide
+pb2;
+
+plot(phit1,wait=true);
+//cout<<"phit1"<<phit1<<endl;
+///////////////////////////////////////////////////************************************************************///////////////////////////////////////////////////
+
+varf Mass(v,w)=int2d(Th)(v*w);
+matrix M=Mass(Mh,Mh);
+
+varf Kb1(v,w)=int2d(Th)(dy(v)*w);
+matrix Ky=Kb1(Mh,Mh);
+
+varf Kb2(v,w)=int2d(Th)(dx(v)*w);
+matrix Kx=Kb2(Mh,Mh);
+
+Mh Kyphit1,dyphit1,Kxdyphit1,Kydyphit1,dxdyphit1,dydyphit1;
+Kyphit1[]=Ky*phit1[];
+dyphit1[]=(M^-1)*Kyphit1[];
+
+Kxdyphit1[]=Kx*dyphit1[];
+dxdyphit1[]=(M^-1)*Kxdyphit1[];
+Kydyphit1[]=Ky*dyphit1[];
+dydyphit1[]=(M^-1)*Kydyphit1[];
+
+//cout<<"taille"<<dxdyphit1[].n<<" "<<dydyphit1[].n<<endl;
+
+matrix ggphit1=[[dxdyphit1[],dydyphit1[]]];
+
+cout<<"tai"<<ggphit1.n<<" "<<ggphit1.m<<endl;
+cout<<dxdyphit1<<endl;
+
+
+fespace Nh(Th,[P0edge,P0edge]);
+varf vn1([nx,ny],[mx,my]) = on(3, nx=N.x,ny=N.y); 
+Nh [nx,ny]; // here the Dof of nx,ny are scramble . 
+nx[]=vn1(0.,Nh);// set [nx,ny]  DoF. 
+
+plot(Th,[nx,ny]); 
+cout<<nx.n<<endl;
+
+varf Arig(v,w)=int2d(Th)(dx(v)*dx(w)+dy(v)*dy(w));
+matrix A=Arig(Mh,Mh);
+varf Bmass(v,w)=int1d(Th,3)(v*w);
+matrix B=Bmass(Mh,Mh);
+Mh g;
+g[]=M*(dxdyphit1*nx+dydyphit1*ny);
+phit2[]=(A^-1)*g[];
+plot(phit2);
